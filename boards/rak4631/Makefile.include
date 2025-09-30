@@ -1,0 +1,10 @@
+# set programming environment
+PROGRAMMER ?= uf2conv
+
+PROGRAMMERS_SUPPORTED += uf2conv
+
+UF2_SOFTDEV ?= DROP
+
+
+# use the common nrf52 config for the rest
+include $(RIOTBOARD)/common/nrf52/Makefile.include

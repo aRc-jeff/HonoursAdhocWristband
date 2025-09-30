@@ -1,0 +1,10 @@
+config BOARD
+    default "rak4631" if BOARD_RAK4631
+
+config BOARD_RAK4631
+    bool
+    default y
+    select BOARD_COMMON_NRF52
+    select CPU_MODEL_NRF52840XXAA
+
+source "$(RIOTBOARD)/common/nrf52/Kconfig"

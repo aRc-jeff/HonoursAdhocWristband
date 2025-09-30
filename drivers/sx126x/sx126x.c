@@ -30,7 +30,7 @@
 #include "sx126x_params.h"
 #include "sx126x_internal.h"
 
-#define ENABLE_DEBUG 0
+#define ENABLE_DEBUG 1
 #include "debug.h"
 
 #ifndef CONFIG_SX126X_PKT_TYPE_DEFAULT
@@ -372,8 +372,8 @@ int sx126x_init(sx126x_t *dev)
 #endif
 #if IS_USED(MODULE_SX126X_DIO3)
      if (dev->params->dio3_mode == SX126X_DIO3_TCXO) {
-        sx126x_set_dio3_as_tcxo_ctrl(dev, dev->params->u_dio3_arg.tcxo_volt,
-                                     dev->params->u_dio3_arg.tcx0_timeout);
+        sx126x_set_dio3_as_tcxo_ctrl(dev, dev->params->dio3_arg.tcxo_volt,
+                                     dev->params->dio3_arg.tcxo_timeout);
 
         /* Once the command SetDIO3AsTCXOCtrl(...) is sent to the device,
            the register controlling the internal cap on XTA will be automatically

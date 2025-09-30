@@ -8,7 +8,17 @@
     "files.associations": {
         "Makefile.*": "makefile",
         "*.mk": "makefile",
-        "*.sketch": "cpp"
+        "*.sketch": "cpp",
+        "cstdint": "c",
+        "netdev.h": "c",
+        "sx126x.h": "c",
+        "ws2812_spi.h": "c",
+        "sx126x_netdev.h": "c",
+        "gpio.h": "c",
+        "sx126x_params.h": "c",
+        "spi.h": "c",
+        "ztimer.h": "c",
+        "descriptor.h": "c"
     },
     "[shellscript][c][cpp]": {
         "editor.tabSize": 4,
