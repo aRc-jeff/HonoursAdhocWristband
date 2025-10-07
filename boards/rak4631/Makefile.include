@@ -1,10 +1,8 @@
 # set programming environment
-PROGRAMMER ?= uf2conv
-
+PROGRAMMER ?= uf2conv 
 PROGRAMMERS_SUPPORTED += uf2conv
-
+# Drop the softdev partition (used for arduino and micropython, not required)
 UF2_SOFTDEV ?= DROP
 
-
-# use the common nrf52 config for the rest
+# Include common nrf52 configurations
 include $(RIOTBOARD)/common/nrf52/Makefile.include

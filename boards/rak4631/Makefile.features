@@ -1,10 +1,12 @@
-CPU_MODEL = nrf52840xxaa
+# Select MCU model
+CPU_MODEL = nrf52840xxaa 
 
-# Put defined MCU peripherals here (in alphabetical order)
+# Define MCU peripherals (in alphabetical order)
 FEATURES_PROVIDED += highlevel_stdio
 FEATURES_PROVIDED += periph_i2c
 FEATURES_PROVIDED += periph_spi
 FEATURES_PROVIDED += periph_uart
 FEATURES_PROVIDED += periph_usbdev
 
+# Include common features for nrf52 MCU
 include $(RIOTBOARD)/common/nrf52/Makefile.features

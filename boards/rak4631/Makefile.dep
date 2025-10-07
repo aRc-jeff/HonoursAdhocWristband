@@ -1,10 +1,17 @@
-# ifneq (,$(filter netdev_default,$(USEMODULE)))
-# endif
-USEMODULE += sx1262
-USEMODULE += sx126x_dio2
-USEMODULE += sx126x_dio3
+# Includes the sx1262 drivers and supporting modules if the compiled project 
+# uses the netdev module
+ifneq (,$(filter netdev_default,$(USEMODULE)))
+  USEMODULE += sx1262
+  USEMODULE += sx126x_dio2
+  USEMODULE += sx126x_dio3
+endif
 
+# Includes support for the UF2 bootloader on the rak4631
+# Not required if alternative flashing option is used
 USEMODULE += boards_common_adafruit-nrf52-bootloader
 
+# Includes the common nrf52 dependencies
 include $(RIOTBOARD)/common/nrf52/Makefile.dep
+
+# Includes support for serial debugging over USB
 include $(RIOTBOARD)/common/makefiles/stdio_cdc_acm.dep.mk
