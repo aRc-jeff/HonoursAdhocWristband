@@ -34,19 +34,48 @@
 #include "sx126x_netdev.h"
 #include "periph/gpio.h"
 #include "sx126x_params.h"
+#include "sema.h"
+#include "tsrb.h"
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
 #define SX126X_MSG_TYPE_ISR     (0x3456)
 #define SX126X_MAX_PAYLOAD_LEN  (128U)
 
+#define PACKET_SIZE 8
+#define QUEUE_SIZE 32 //must be a power of 2
+
 static char stack[SX126X_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
-static char message[SX126X_MAX_PAYLOAD_LEN];
+static uint8_t message[SX126X_MAX_PAYLOAD_LEN];
 
 static sx126x_t sx1262;
 static netdev_t *netdev = &sx1262.netdev;
+
+static sema_t lock;
+
+typedef struct
+{
+    uint16_t cmdIndex;
+    uint8_t TTL;
+    uint8_t CMD;
+    uint8_t RED;
+    uint8_t GREEN;
+    uint8_t BLUE;
+    bool valid;
+} cmd_t;
+
+static tsrb_t rxCMDs;
+static tsrb_t txCMDs;
+static cmd_t rxCMDbuff[QUEUE_SIZE];
+static cmd_t txCMDbuff[QUEUE_SIZE];
+
+void init_thread_tools(){
+    tsrb_init(&rxCMDs, rxCMDbuff, sizeof(rxCMDbuff));
+    tsrb_init(&txCMDs, txCMDbuff, sizeof(txCMDbuff));
+    sema_create(&lock, 1);
+}
 
 static void event_cb(netdev_t *dev, netdev_event_t event)
 {
@@ -74,10 +103,13 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
                 packet_info.rssi, packet_info.snr,
                 sx126x_get_lora_time_on_air_in_ms(&sx1262.pkt_params, &sx1262.mod_params)
                 );
-            netopt_state_t state = NETOPT_STATE_RX;
-            dev->driver->set(dev, NETOPT_STATE, &state, sizeof(state));
-            puts("sleeping mcu");
-            cortexm_sleep(1);
+
+            cmd_t rxCMD = unpackPacket(&message);
+            if (rxCMD.valid){
+                sema_wait(&lock);
+                tsrb_add(&rxCMDs, &rxCMD, sizeof(rxCMD));
+                sema_post(&lock);
+            }
         }
         break;
 
@@ -116,43 +148,66 @@ void *_recv_thread(void *arg)
     }
 }
 
-// /* event callback: called on TX done, RX done, etc. */
-// static void event_cb(netdev_t *dev, netdev_event_t event)
-// {
-//     (void)dev;
-//     if (event == NETDEV_EVENT_TX_COMPLETE) {
-//         puts("TX complete");
-//     }
-//     else if (event == NETDEV_EVENT_RX_COMPLETE) {
-//         puts("RX complete");
-//     }
-//     else {
-//         printf("other event: %d\n", event);
-//     }
-// }
-
-static void delay(void)
+static void delay(int seconds)
 {
-    if (IS_USED(MODULE_ZTIMER)) {
-        puts("ZTimer working");
-        ztimer_sleep(ZTIMER_USEC, 20 * US_PER_SEC);
-    }
-    else {
-        /*
-         * As fallback for freshly ported boards with no timer drivers written
-         * yet, we just use the CPU to delay execution and assume that roughly
-         * 20 CPU cycles are spend per loop iteration.
-         *
-         * Note that the volatile qualifier disables compiler optimizations for
-         * all accesses to the counter variable. Without volatile, modern
-         * compilers would detect that the loop is only wasting CPU cycles and
-         * optimize it out - but here the wasting of CPU cycles is desired.
-         */
-        puts("Using clock count");
-        uint32_t loops = coreclk() / 20;
-        for (volatile uint32_t i = 0; i < loops; i++) { }
-    }
+    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
 }
+
+static uint8_t crc8(const uint8_t *data, uint8_t len)
+{
+    uint8_t crc = 0x00;
+    for (uint8_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (uint8_t b = 0; b < 8; b++) {
+            if (crc & 0x80)
+                crc = (crc << 1) ^ 0x31; // polynomial x^8 + x^5 + x^4 + 1
+            else
+                crc <<= 1;
+        }
+    }
+    return crc;
+}
+
+uint8_t * generatePacket(cmd_t message){
+    static uint8_t packet[PACKET_SIZE];
+
+    packet[0] = (message.cmdIndex >> 8) & 0xFF;   // high byte
+    packet[1] = message.cmdIndex & 0xFF;          // low byte
+    packet[2] = message.TTL;
+    packet[3] = message.CMD;
+    packet[4] = message.RED;
+    packet[5] = message.GREEN;
+    packet[6] = message.BLUE;
+
+    // compute CRC over first 7 bytes
+    packet[7] = crc8(packet, 7);
+
+    return packet;
+}
+
+cmd_t unpackPacket(uint8_t* packet){
+    cmd_t result = {0};
+
+    // verify CRC
+    uint8_t computed_crc = crc8(packet, PACKET_SIZE - 1);
+    uint8_t received_crc = packet[PACKET_SIZE - 1];
+    if (computed_crc != received_crc) {
+        // CRC mismatch — return empty/invalid command
+        return result;
+    }
+
+    // unpack bytes into struct
+    result.valid = true;
+    result.cmdIndex = (packet[0] << 8) | packet[1];
+    result.TTL      = packet[2];
+    result.CMD      = packet[3];
+    result.RED      = packet[4];
+    result.GREEN    = packet[5];
+    result.BLUE     = packet[6];
+
+    return result;
+}
+
 
 int main(void)
 {
@@ -172,12 +227,12 @@ int main(void)
     int res = netdev->driver->init(netdev);
     printf("something went right %d\n", res);
 
-    // static uint8_t buf[] = "hello world";
-    // iolist_t iolist = {
-    //     .iol_base = buf,
-    //     .iol_len  = sizeof(buf),
-    //     .iol_next = NULL,
-    // };
+    static uint8_t buf[] = "hello world";
+    iolist_t iolist = {
+        .iol_base = buf,
+        .iol_len  = sizeof(buf),
+        .iol_next = NULL,
+    };
 
     _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               0, _recv_thread, netdev,
@@ -194,9 +249,18 @@ int main(void)
     cortexm_sleep(1);
 
     while (1) {
-        delay();
+        delay(2);
         //int res = netdev->driver->send(netdev, &iolist);
         //printf("send() returned %d\n", res);
+        
+        sema_wait(&lock);
+        cmd_t message;
+        tsrb_get(&rxCMDs, &message, sizeof(message));
+        
+        netopt_state_t state = NETOPT_STATE_RX;
+        netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+        puts("sleeping mcu");
+        cortexm_sleep(1);
     }
 
     return 0;

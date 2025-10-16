@@ -1,0 +1,10 @@
+config BOARD
+    default "flash-or-trash-v1" if BOARD_FLASH-OR-TRASH-V1
+
+config BOARD_FLASH-OR-TRASH-V1
+    bool
+    default y
+    select BOARD_COMMON_NRF52
+    select CPU_MODEL_NRF52840XXAA
+
+source "$(RIOTBOARD)/common/nrf52/Kconfig"

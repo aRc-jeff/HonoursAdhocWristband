@@ -1,5 +1,5 @@
 # set programming environment
-PROGRAMMER ?= uf2conv 
+PROGRAMMER ?= uf2conv
 PROGRAMMERS_SUPPORTED += uf2conv
 # Drop the softdev partition (used for arduino and micropython, not required)
 UF2_SOFTDEV ?= DROP

@@ -1,0 +1,6 @@
+# set programming environment
+PROGRAMMER ?= openocd
+PROGRAMMERS_SUPPORTED += openocd
+
+# Include common nrf52 configurations
+include $(RIOTBOARD)/common/nrf52/Makefile.include
