@@ -48,14 +48,14 @@ static void delay(void)
 
 int main(void)
 {
-    bool tmp = true;
+    // bool tmp = true;
     while (1) {
         delay();
         LED2_TOGGLE;
-        if (tmp){
-            LED3_TOGGLE;
-            tmp = !tmp;
-        }
+        // if (tmp){
+        //     LED3_TOGGLE;
+        // }
+        // tmp = !tmp;
     }
     return 0;
 }

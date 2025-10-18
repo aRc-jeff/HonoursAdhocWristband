@@ -59,7 +59,7 @@ static const spi_conf_t spi_config[] = {
     {
         // select SPI controller for ws2812 LED
         .dev  = NRF_SPIM2,
-        .mosi = GPIO_PIN(0, 17),
+        .mosi = GPIO_PIN(0, 21),
     }
 };
 
@@ -77,8 +77,8 @@ static const i2c_conf_t i2c_config[] = {
         // select i2c controller
         .dev = NRF_TWIM0,
         // set i2c pins
-        .scl = GPIO_PIN(0, 14),
-        .sda = GPIO_PIN(0, 13),
+        .scl = GPIO_PIN(0, 22),
+        .sda = GPIO_PIN(0, 23),
         // set i2c speed
         .speed = I2C_SPEED_NORMAL
     },

@@ -135,7 +135,7 @@ static void delay(void)
 {
     if (IS_USED(MODULE_ZTIMER)) {
         puts("ZTimer working");
-        ztimer_sleep(ZTIMER_USEC, 20 * US_PER_SEC);
+        ztimer_sleep(ZTIMER_USEC, 5 * US_PER_SEC);
     }
     else {
         /*
@@ -156,7 +156,9 @@ static void delay(void)
 
 int main(void)
 {
-    ANT_SW_OFF;
+    delay();
+    delay();
+    ANT_SW_ON;
     puts("Init SX1262...");
     printf("sx1262 driver %p\n", netdev->driver);
 
@@ -164,20 +166,17 @@ int main(void)
 
     printf("sx1262 driver %p\n", netdev->driver);
 
-    // uint16_t chan = 15;
-    // netdev->driver->set(netdev, NETOPT_CHANNEL, &chan, sizeof(chan));
-
     puts("Init netdev...");
     netdev->event_callback = event_cb;
     int res = netdev->driver->init(netdev);
     printf("something went right %d\n", res);
 
-    // static uint8_t buf[] = "hello world";
-    // iolist_t iolist = {
-    //     .iol_base = buf,
-    //     .iol_len  = sizeof(buf),
-    //     .iol_next = NULL,
-    // };
+    static uint8_t buf[] = "hello world";
+    iolist_t iolist = {
+        .iol_base = buf,
+        .iol_len  = sizeof(buf),
+        .iol_next = NULL,
+    };
 
     _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               0, _recv_thread, netdev,
@@ -188,15 +187,21 @@ int main(void)
         return 1;
     }
 
-    netopt_state_t state = NETOPT_STATE_RX;
-    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-    puts("sleeping mcu");
-    cortexm_sleep(1);
+    uint16_t chan = 15;
+    netdev->driver->set(netdev, NETOPT_CHANNEL, &chan, sizeof(chan));
+    uint32_t freq = 915000000;
+    netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &freq, sizeof(freq));
+
+
+    // netopt_state_t state = NETOPT_STATE_RX;
+    // netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+    // puts("sleeping mcu");
+    // cortexm_sleep(1);
 
     while (1) {
         delay();
-        //int res = netdev->driver->send(netdev, &iolist);
-        //printf("send() returned %d\n", res);
+        int res = netdev->driver->send(netdev, &iolist);
+        printf("send() returned %d\n", res);
     }
 
     return 0;

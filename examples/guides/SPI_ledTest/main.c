@@ -59,7 +59,7 @@ int main(void)
     while (1) {
         delay();
         if (tmp){
-            setLED(0, 128, 0, 128);
+            setLED(0, 255, 0, 0);
             WS2812_Send();
         }
         else{

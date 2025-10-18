@@ -29,14 +29,14 @@ extern "C" {
 #define ANT_SW_PIN              GPIO_PIN(1, 5)
 #define ANT_SW_MASK             (1 << 5)
 
-#define LED2_PIN                GPIO_PIN(0, 26)
-#define LED2_MASK               (1 << 26)
-#define LED3_PIN                GPIO_PIN(0, 27)
-#define LED3_MASK               (1 << 27)
+// #define LED2_PIN                GPIO_PIN(0, 26)
+// #define LED2_MASK               (1 << 26)
+// #define LED3_PIN                GPIO_PIN(0, 27)
+// #define LED3_MASK               (1 << 27)
 
 // Collect all port 1 devices into a single mask (need separate one for port 0)
 #define GPIO_MASK_P1            (LED0_MASK | LED1_MASK | ANT_SW_MASK)
-#define GPIO_MASK_P0            (LED2_MASK | LED3_MASK)
+// #define GPIO_MASK_P0            (LED2_MASK) // | LED3_MASK)
 
 // Define macros to turn LED0 on/off
 #define LED0_ON                 (NRF_P1->OUTSET = LED0_MASK)
@@ -49,14 +49,14 @@ extern "C" {
 #define LED1_TOGGLE             (NRF_P1->OUT   ^= LED1_MASK)
 
 // Define macros to turn LED0 on/off
-#define LED2_ON                 (NRF_P0->OUTSET = LED2_MASK)
-#define LED2_OFF                (NRF_P0->OUTCLR = LED2_MASK)
-#define LED2_TOGGLE             (NRF_P0->OUT   ^= LED2_MASK)
+// #define LED2_ON                 (NRF_P0->OUTSET = LED2_MASK)
+// #define LED2_OFF                (NRF_P0->OUTCLR = LED2_MASK)
+// #define LED2_TOGGLE             (NRF_P0->OUT   ^= LED2_MASK)
 
 // Define macros to turn LED1 on/off
-#define LED3_ON                 (NRF_P0->OUTSET = LED3_MASK)
-#define LED3_OFF                (NRF_P0->OUTCLR = LED3_MASK)
-#define LED3_TOGGLE             (NRF_P0->OUT   ^= LED3_MASK)
+// #define LED3_ON                 (NRF_P0->OUTSET = LED3_MASK)
+// #define LED3_OFF                (NRF_P0->OUTCLR = LED3_MASK)
+// #define LED3_TOGGLE             (NRF_P0->OUT   ^= LED3_MASK)
 
 // Define macros to turn Antenna switch on/off
 #define ANT_SW_ON               (NRF_P1->OUTSET = ANT_SW_MASK)
@@ -77,9 +77,9 @@ extern "C" {
 #define SX126X_PARAM_TYPE               SX126X_TYPE_SX1262
 #define SX126X_PARAM_REGULATOR          SX126X_REG_MODE_LDO
 #define SX126X_PARAM_DIO2_MODE          SX126X_DIO2_RF_SWITCH
-#define SX126X_PARAM_DIO3_MODE          SX126X_DIO3_TCXO
-#define SX126X_PARAM_TCXO_VOLTAGE       SX126X_TCXO_CTRL_3_0V
-#define SX126X_PARAM_TCXO_TIMEOUT       24
+#define SX126X_PARAM_DIO3_MODE          SX126X_DIO3_UNUSED
+// #define SX126X_PARAM_TCXO_VOLTAGE       SX126X_TCXO_CTRL_3_0V
+// #define SX126X_PARAM_TCXO_TIMEOUT       24
 /** @} */
 
 #ifdef __cplusplus

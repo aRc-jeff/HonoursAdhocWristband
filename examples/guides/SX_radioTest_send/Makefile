@@ -1,8 +1,8 @@
 # name of your application
-APPLICATION = SPI_ledTest
+APPLICATION = SX_test_send
 
 # Change this to your board if you want to build for a different board
-BOARD ?= flash-or-trash-v1
+BOARD ?= rak4631
 
 # This has to be the absolute path to the RIOT base directory:
 # If you are following the tutorial, your RIOT base directory will
@@ -22,5 +22,6 @@ QUIET ?= 1
 FEATURES_OPTIONAL += periph_timer
 
 USEMODULE += periph_spi
+USEMODULE += netdev
 
 include $(RIOTBASE)/Makefile.include

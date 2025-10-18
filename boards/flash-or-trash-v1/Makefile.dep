@@ -8,3 +8,6 @@ endif
 
 # Includes the common nrf52 dependencies
 include $(RIOTBOARD)/common/nrf52/Makefile.dep
+
+# Includes support for serial debugging over USB
+include $(RIOTBOARD)/common/makefiles/stdio_cdc_acm.dep.mk

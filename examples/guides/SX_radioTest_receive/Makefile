@@ -1,5 +1,5 @@
 # name of your application
-APPLICATION = creating_project_example
+APPLICATION = SX_test_receive
 
 # Change this to your board if you want to build for a different board
 BOARD ?= rak4631

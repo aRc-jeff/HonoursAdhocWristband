@@ -38,7 +38,9 @@
         "cpu_conf.h": "c",
         "unistd.h": "c",
         "sema.h": "c",
-        "priority_queue.h": "c"
+        "priority_queue.h": "c",
+        "bitset": "c",
+        "compare": "c"
     },
     "[shellscript][c][cpp]": {
         "editor.tabSize": 4,

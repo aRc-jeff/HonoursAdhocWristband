@@ -3,7 +3,7 @@
 #include "periph_conf.h"
 #include "periph/spi.h"
 
-#define NUM_LED 3
+#define NUM_LED 1
 uint8_t LED_Data[NUM_LED][4];
 
 
