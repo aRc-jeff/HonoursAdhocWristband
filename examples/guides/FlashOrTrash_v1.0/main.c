@@ -35,6 +35,8 @@
 #include "periph/gpio.h"
 #include "sx126x_params.h"
 #include "sema.h"
+#include "cond.h"
+#include "mutex.h"
 #include "tsrb.h"
 
 #define SX126X_MSG_QUEUE        (8U)
@@ -53,7 +55,8 @@ static uint8_t message[SX126X_MAX_PAYLOAD_LEN];
 static sx126x_t sx1262;
 static netdev_t *netdev = &sx1262.netdev;
 
-static sema_t lock;
+static mutex_t lock;
+static cond_t condition;
 
 typedef struct
 {
@@ -65,93 +68,6 @@ typedef struct
     uint8_t BLUE;
     bool valid;
 } cmd_t;
-
-static tsrb_t rxCMDs;
-static tsrb_t txCMDs;
-static cmd_t rxCMDbuff[QUEUE_SIZE];
-static cmd_t txCMDbuff[QUEUE_SIZE];
-
-void init_thread_tools(){
-    tsrb_init(&rxCMDs, rxCMDbuff, sizeof(rxCMDbuff));
-    tsrb_init(&txCMDs, txCMDbuff, sizeof(txCMDbuff));
-    sema_create(&lock, 1);
-}
-
-static void event_cb(netdev_t *dev, netdev_event_t event)
-{
-    if (event == NETDEV_EVENT_ISR) {
-        msg_t msg;
-        msg.type = SX126X_MSG_TYPE_ISR;
-        if (msg_send(&msg, _recv_pid) <= 0) {
-            puts("sx126x_netdev: possibly lost interrupt.");
-        }
-    }
-    else {
-        switch (event) {
-        case NETDEV_EVENT_RX_STARTED:
-            puts("Data reception started");
-            break;
-
-        case NETDEV_EVENT_RX_COMPLETE:
-        {
-            size_t len = dev->driver->recv(dev, NULL, 0, 0);
-            netdev_lora_rx_info_t packet_info;
-            dev->driver->recv(dev, message, len, &packet_info);
-            printf(
-                "Received: \"%s\" (%" PRIuSIZE " bytes) - [RSSI: %i, SNR: %i, TOA: %" PRIu32 "ms]\n",
-                message, len,
-                packet_info.rssi, packet_info.snr,
-                sx126x_get_lora_time_on_air_in_ms(&sx1262.pkt_params, &sx1262.mod_params)
-                );
-
-            cmd_t rxCMD = unpackPacket(&message);
-            if (rxCMD.valid){
-                sema_wait(&lock);
-                tsrb_add(&rxCMDs, &rxCMD, sizeof(rxCMD));
-                sema_post(&lock);
-            }
-        }
-        break;
-
-        case NETDEV_EVENT_TX_COMPLETE:
-            puts("Transmission completed");
-            break;
-
-        case NETDEV_EVENT_TX_TIMEOUT:
-            puts("Transmission timeout");
-            break;
-
-        default:
-            printf("Unexpected netdev event received: %d\n", event);
-            break;
-        }
-    }
-}
-
-void *_recv_thread(void *arg)
-{
-    netdev_t *netdev = arg;
-
-    static msg_t _msg_queue[SX126X_MSG_QUEUE];
-
-    msg_init_queue(_msg_queue, SX126X_MSG_QUEUE);
-
-    while (1) {
-        msg_t msg;
-        msg_receive(&msg);
-        if (msg.type == SX126X_MSG_TYPE_ISR) {
-            netdev->driver->isr(netdev);
-        }
-        else {
-            puts("Unexpected msg type");
-        }
-    }
-}
-
-static void delay(int seconds)
-{
-    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
-}
 
 static uint8_t crc8(const uint8_t *data, uint8_t len)
 {
@@ -208,9 +124,98 @@ cmd_t unpackPacket(uint8_t* packet){
     return result;
 }
 
+static tsrb_t rxCMDs;
+static tsrb_t txCMDs;
+static cmd_t rxCMDbuff[QUEUE_SIZE];
+static cmd_t txCMDbuff[QUEUE_SIZE];
+
+void init_thread_tools(void){
+    tsrb_init(&rxCMDs, (uint8_t*)rxCMDbuff, sizeof(rxCMDbuff));
+    tsrb_init(&txCMDs, (uint8_t*)txCMDbuff, sizeof(txCMDbuff));
+    mutex_init(&lock);
+    cond_init(&condition);
+}
+
+static void event_cb(netdev_t *dev, netdev_event_t event)
+{
+    if (event == NETDEV_EVENT_ISR) {
+        msg_t msg;
+        msg.type = SX126X_MSG_TYPE_ISR;
+        if (msg_send(&msg, _recv_pid) <= 0) {
+            puts("sx126x_netdev: possibly lost interrupt.");
+        }
+    }
+    else {
+        switch (event) {
+        case NETDEV_EVENT_RX_STARTED:
+            puts("Data reception started");
+            break;
+
+        case NETDEV_EVENT_RX_COMPLETE:
+        {
+            size_t len = dev->driver->recv(dev, NULL, 0, 0);
+            netdev_lora_rx_info_t packet_info;
+            dev->driver->recv(dev, message, len, &packet_info);
+            printf(
+                "Received: \"%s\" (%" PRIuSIZE " bytes) - [RSSI: %i, SNR: %i, TOA: %" PRIu32 "ms]\n",
+                message, len,
+                packet_info.rssi, packet_info.snr,
+                sx126x_get_lora_time_on_air_in_ms(&sx1262.pkt_params, &sx1262.mod_params)
+                );
+
+            cmd_t rxCMD = unpackPacket(message);
+            if (rxCMD.valid){
+                mutex_lock(&lock);
+                tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, sizeof(rxCMD));
+                mutex_unlock(&lock);
+                cond_signal(&condition);
+            }
+        }
+        break;
+
+        case NETDEV_EVENT_TX_COMPLETE:
+            puts("Transmission completed");
+            break;
+
+        case NETDEV_EVENT_TX_TIMEOUT:
+            puts("Transmission timeout");
+            break;
+
+        default:
+            printf("Unexpected netdev event received: %d\n", event);
+            break;
+        }
+    }
+}
+
+void *_recv_thread(void *arg)
+{
+    netdev_t *netdev = arg;
+
+    static msg_t _msg_queue[SX126X_MSG_QUEUE];
+
+    msg_init_queue(_msg_queue, SX126X_MSG_QUEUE);
+
+    while (1) {
+        msg_t msg;
+        msg_receive(&msg);
+        if (msg.type == SX126X_MSG_TYPE_ISR) {
+            netdev->driver->isr(netdev);
+        }
+        else {
+            puts("Unexpected msg type");
+        }
+    }
+}
+
+static void delay(int seconds)
+{
+    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
+}
 
 int main(void)
 {
+    delay(2);
     ANT_SW_OFF;
     puts("Init SX1262...");
     printf("sx1262 driver %p\n", netdev->driver);
@@ -227,13 +232,6 @@ int main(void)
     int res = netdev->driver->init(netdev);
     printf("something went right %d\n", res);
 
-    static uint8_t buf[] = "hello world";
-    iolist_t iolist = {
-        .iol_base = buf,
-        .iol_len  = sizeof(buf),
-        .iol_next = NULL,
-    };
-
     _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               0, _recv_thread, netdev,
                               "recv_thread");
@@ -248,19 +246,40 @@ int main(void)
     puts("sleeping mcu");
     cortexm_sleep(1);
 
+    static uint16_t cmdIndex = 0;
+
+
     while (1) {
-        delay(2);
+        // delay(2);
         //int res = netdev->driver->send(netdev, &iolist);
         //printf("send() returned %d\n", res);
-        
-        sema_wait(&lock);
+        if (tsrb_empty(&rxCMDs)){
+            cond_wait(&condition, &lock);
+        }
+        else{
+            mutex_lock(&lock);
+        }
         cmd_t message;
-        tsrb_get(&rxCMDs, &message, sizeof(message));
-        
-        netopt_state_t state = NETOPT_STATE_RX;
-        netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-        puts("sleeping mcu");
-        cortexm_sleep(1);
+        tsrb_get(&rxCMDs, (uint8_t*)&message, sizeof(message));
+        mutex_unlock(&lock);
+
+        if (message.cmdIndex < cmdIndex){
+            cmdIndex = message.cmdIndex;
+            if (message.TTL-- > 0){
+                iolist_t iolist = {
+                    .iol_base = (uint8_t *)&message,
+                    .iol_len  = sizeof(message),
+                    .iol_next = NULL,
+                };
+                netdev->driver->send(netdev, &iolist);
+                netopt_state_t state = NETOPT_STATE_RX;
+                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+            }
+
+        }
+
+        // puts("sleeping mcu");
+        // cortexm_sleep(1);
     }
 
     return 0;

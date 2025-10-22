@@ -1,8 +1,8 @@
 /*
  * WS2812_SPI.h
  *
- *  Created on: Sep 4, 2023
- *      Author: arunrawat
+ *  Created on: Oct 22, 2025
+ *      Author: TIM
  */
 
 #ifndef INC_WS2812_SPI_H_

@@ -187,8 +187,8 @@ int main(void)
         return 1;
     }
 
-    uint16_t chan = 15;
-    netdev->driver->set(netdev, NETOPT_CHANNEL, &chan, sizeof(chan));
+    // uint16_t chan = 15;
+    // netdev->driver->set(netdev, NETOPT_CHANNEL, &chan, sizeof(chan));
     uint32_t freq = 915000000;
     netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &freq, sizeof(freq));
 

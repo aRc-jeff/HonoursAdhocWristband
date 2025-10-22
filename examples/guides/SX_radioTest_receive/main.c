@@ -135,7 +135,7 @@ static void delay(void)
 {
     if (IS_USED(MODULE_ZTIMER)) {
         puts("ZTimer working");
-        ztimer_sleep(ZTIMER_USEC, 10 * US_PER_SEC);
+        ztimer_sleep(ZTIMER_USEC, 5 * US_PER_SEC);
     }
     else {
         /*

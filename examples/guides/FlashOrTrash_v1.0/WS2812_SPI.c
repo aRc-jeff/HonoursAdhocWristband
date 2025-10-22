@@ -41,6 +41,6 @@ void WS2812_Send (void)
 }
 
 void setOneLED (int RED, int GREEN, int BLUE){
-    setLed(0, RED, GREEN, BLUE);
+    setLED(0, RED, GREEN, BLUE);
     WS2812_Send();
 }
