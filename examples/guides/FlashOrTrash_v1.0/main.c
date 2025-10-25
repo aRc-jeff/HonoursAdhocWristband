@@ -38,6 +38,7 @@
 #include "cond.h"
 #include "mutex.h"
 #include "tsrb.h"
+#include "cmd.h"
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
@@ -50,6 +51,9 @@
 static char stack[SX126X_STACKSIZE];
 static kernel_pid_t _recv_pid;
 
+static char effectStack[THREAD_STACKSIZE_DEFAULT];
+static kernel_pid_t _effect_pid = NULL;
+
 static uint8_t message[SX126X_MAX_PAYLOAD_LEN];
 
 static sx126x_t sx1262;
@@ -57,17 +61,7 @@ static netdev_t *netdev = &sx1262.netdev;
 
 static mutex_t lock;
 static cond_t condition;
-
-typedef struct
-{
-    uint16_t cmdIndex;
-    uint8_t TTL;
-    uint8_t CMD;
-    uint8_t RED;
-    uint8_t GREEN;
-    uint8_t BLUE;
-    bool valid;
-} cmd_t;
+static uint16_t cmdIndex = 0;
 
 static uint8_t crc8(const uint8_t *data, uint8_t len)
 {
@@ -165,10 +159,24 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
 
             cmd_t rxCMD = unpackPacket(message);
             if (rxCMD.valid){
-                mutex_lock(&lock);
-                tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, sizeof(rxCMD));
-                mutex_unlock(&lock);
-                cond_signal(&condition);
+                if (rxCMD.cmdIndex < cmdIndex){
+                    cmdIndex = rxCMD.cmdIndex;
+                    if (rxCMD.TTL-- > 0){
+                        uint8_t* returnMessage = generatePacket(rxCMD);
+                        iolist_t iolist = {
+                            .iol_base = returnMessage,
+                            .iol_len  = sizeof(returnMessage),
+                            .iol_next = NULL,
+                        };
+                        netdev->driver->send(netdev, &iolist);
+                        netopt_state_t state = NETOPT_STATE_RX;
+                        netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+                    }
+                    mutex_lock(&lock);
+                    tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, sizeof(rxCMD));
+                    mutex_unlock(&lock);
+                    cond_signal(&condition);
+                }
             }
         }
         break;
@@ -216,16 +224,13 @@ static void delay(int seconds)
 int main(void)
 {
     delay(2);
-    ANT_SW_OFF;
+    ANT_SW_ON;
     puts("Init SX1262...");
     printf("sx1262 driver %p\n", netdev->driver);
 
     sx126x_setup(&sx1262, &sx126x_params[0], 0);
 
     printf("sx1262 driver %p\n", netdev->driver);
-
-    // uint16_t chan = 15;
-    // netdev->driver->set(netdev, NETOPT_CHANNEL, &chan, sizeof(chan));
 
     puts("Init netdev...");
     netdev->event_callback = event_cb;
@@ -246,13 +251,7 @@ int main(void)
     puts("sleeping mcu");
     cortexm_sleep(1);
 
-    static uint16_t cmdIndex = 0;
-
-
     while (1) {
-        // delay(2);
-        //int res = netdev->driver->send(netdev, &iolist);
-        //printf("send() returned %d\n", res);
         if (tsrb_empty(&rxCMDs)){
             cond_wait(&condition, &lock);
         }
@@ -263,23 +262,15 @@ int main(void)
         tsrb_get(&rxCMDs, (uint8_t*)&message, sizeof(message));
         mutex_unlock(&lock);
 
-        if (message.cmdIndex < cmdIndex){
-            cmdIndex = message.cmdIndex;
-            if (message.TTL-- > 0){
-                iolist_t iolist = {
-                    .iol_base = (uint8_t *)&message,
-                    .iol_len  = sizeof(message),
-                    .iol_next = NULL,
-                };
-                netdev->driver->send(netdev, &iolist);
-                netopt_state_t state = NETOPT_STATE_RX;
-                netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-            }
-
+        if (thread_getstatus(_effect_pid) != STATUS_STOPPED) {
+            //somehow kill the thread...
         }
 
-        // puts("sleeping mcu");
-        // cortexm_sleep(1);
+        _effect_pid = thread_create(effectStack, sizeof(effectStack), 
+                            THREAD_PRIORITY_MAIN - 1,
+                            0, effectFuncs[message.CMD], message,
+                            "effect_thread");
+
     }
 
     return 0;
