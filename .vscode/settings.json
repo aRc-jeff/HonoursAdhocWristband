@@ -40,7 +40,10 @@
         "sema.h": "c",
         "priority_queue.h": "c",
         "bitset": "c",
-        "compare": "c"
+        "compare": "c",
+        "lora.h": "c",
+        "board.h": "c",
+        "periph_conf.h": "c"
     },
     "[shellscript][c][cpp]": {
         "editor.tabSize": 4,

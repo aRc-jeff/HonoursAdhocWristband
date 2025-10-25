@@ -10,7 +10,7 @@
 
 #include "cmd.h"
 
-int (*effectFuncs[])(cmd_t)
+extern int (*effectFuncs[])(cmd_t);
 // void setLED (int led, int RED, int GREEN, int BLUE);
 // void setOneLED (int RED, int GREEN, int BLUE);
 // void WS2812_Send (void);

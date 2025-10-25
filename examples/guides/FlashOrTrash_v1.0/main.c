@@ -34,33 +34,27 @@
 #include "sx126x_netdev.h"
 #include "periph/gpio.h"
 #include "sx126x_params.h"
-#include "sema.h"
-#include "cond.h"
-#include "mutex.h"
-#include "tsrb.h"
 #include "cmd.h"
+#include "syncTools.h"
+#include "Effects.h"
+
+#define BOARD_LOCATION_X 1
+#define BOARD_LOCATION_Y 1
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
 #define SX126X_MSG_TYPE_ISR     (0x3456)
 #define SX126X_MAX_PAYLOAD_LEN  (128U)
-
-#define PACKET_SIZE 8
-#define QUEUE_SIZE 32 //must be a power of 2
+#define PACKET_SIZE 16 //must be a power of 2
 
 static char stack[SX126X_STACKSIZE];
 static kernel_pid_t _recv_pid;
-
-static char effectStack[THREAD_STACKSIZE_DEFAULT];
-static kernel_pid_t _effect_pid = NULL;
 
 static uint8_t message[SX126X_MAX_PAYLOAD_LEN];
 
 static sx126x_t sx1262;
 static netdev_t *netdev = &sx1262.netdev;
 
-static mutex_t lock;
-static cond_t condition;
 static uint16_t cmdIndex = 0;
 
 static uint8_t crc8(const uint8_t *data, uint8_t len)
@@ -88,9 +82,17 @@ uint8_t * generatePacket(cmd_t message){
     packet[4] = message.RED;
     packet[5] = message.GREEN;
     packet[6] = message.BLUE;
+    packet[7] = message.P1X;
+    packet[8] = message.P1Y;
+    packet[9] = message.P2X;
+    packet[10] = message.P2Y;
+    packet[11] = message.blank1;
+    packet[12] = message.blank2;
+    packet[13] = message.blank3;
+    packet[14] = message.queueable;
 
-    // compute CRC over first 7 bytes
-    packet[7] = crc8(packet, 7);
+    // compute CRC over first 15 bytes
+    packet[15] = crc8(packet, PACKET_SIZE-1);
 
     return packet;
 }
@@ -115,19 +117,16 @@ cmd_t unpackPacket(uint8_t* packet){
     result.GREEN    = packet[5];
     result.BLUE     = packet[6];
 
+    result.P1X     = packet[7];
+    result.P1Y     = packet[8];
+    result.P2X     = packet[9];
+    result.P2Y     = packet[10];
+    result.blank1     = packet[11];
+    result.blank2     = packet[12];
+    result.blank3     = packet[13];
+    result.queueable     = packet[14];
+
     return result;
-}
-
-static tsrb_t rxCMDs;
-static tsrb_t txCMDs;
-static cmd_t rxCMDbuff[QUEUE_SIZE];
-static cmd_t txCMDbuff[QUEUE_SIZE];
-
-void init_thread_tools(void){
-    tsrb_init(&rxCMDs, (uint8_t*)rxCMDbuff, sizeof(rxCMDbuff));
-    tsrb_init(&txCMDs, (uint8_t*)txCMDbuff, sizeof(txCMDbuff));
-    mutex_init(&lock);
-    cond_init(&condition);
 }
 
 static void event_cb(netdev_t *dev, netdev_event_t event)
@@ -173,6 +172,10 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
                         netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
                     }
                     mutex_lock(&lock);
+                    if (!rxCMD.queueable){
+                        tsrb_clear(&rxCMDs);
+                        newCMDFlag = true;
+                    }
                     tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, sizeof(rxCMD));
                     mutex_unlock(&lock);
                     cond_signal(&condition);
@@ -218,25 +221,28 @@ void *_recv_thread(void *arg)
 
 static void delay(int seconds)
 {
-    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
+    ztimer_sleep(ZTIMER_MSEC, seconds * MS_PER_SEC);
 }
 
 int main(void)
 {
     delay(2);
+    puts("Init ThreadTools...");
+    init_thread_tools();
     ANT_SW_ON;
     puts("Init SX1262...");
-    printf("sx1262 driver %p\n", netdev->driver);
-
     sx126x_setup(&sx1262, &sx126x_params[0], 0);
-
-    printf("sx1262 driver %p\n", netdev->driver);
 
     puts("Init netdev...");
     netdev->event_callback = event_cb;
-    int res = netdev->driver->init(netdev);
-    printf("something went right %d\n", res);
+    netdev->driver->init(netdev);
 
+    uint32_t freq = 915000000;
+    netdev->driver->set(netdev, NETOPT_CHANNEL_FREQUENCY, &freq, sizeof(freq));
+    netopt_state_t state = NETOPT_STATE_RX;
+    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
+
+    puts("Create recv thread...");
     _recv_pid = thread_create(stack, sizeof(stack), THREAD_PRIORITY_MAIN - 1,
                               0, _recv_thread, netdev,
                               "recv_thread");
@@ -246,13 +252,13 @@ int main(void)
         return 1;
     }
 
-    netopt_state_t state = NETOPT_STATE_RX;
-    netdev->driver->set(netdev, NETOPT_STATE, &state, sizeof(state));
-    puts("sleeping mcu");
-    cortexm_sleep(1);
+    puts("Init Complete");
+    // puts("sleeping mcu");
+    // cortexm_sleep(1);
 
     while (1) {
         if (tsrb_empty(&rxCMDs)){
+            puts("Conditional waiting...");
             cond_wait(&condition, &lock);
         }
         else{
@@ -260,17 +266,15 @@ int main(void)
         }
         cmd_t message;
         tsrb_get(&rxCMDs, (uint8_t*)&message, sizeof(message));
+        newCMDFlag = false;
         mutex_unlock(&lock);
-
-        if (thread_getstatus(_effect_pid) != STATUS_STOPPED) {
-            //somehow kill the thread...
+        if((message.P1X <= BOARD_LOCATION_X) &&
+            (BOARD_LOCATION_X <= message.P2X)){
+            if((message.P1Y <= BOARD_LOCATION_Y) &&
+                (BOARD_LOCATION_Y <= message.P2Y)){
+                effectFuncs[message.CMD](message);
+            }
         }
-
-        _effect_pid = thread_create(effectStack, sizeof(effectStack), 
-                            THREAD_PRIORITY_MAIN - 1,
-                            0, effectFuncs[message.CMD], message,
-                            "effect_thread");
-
     }
 
     return 0;
