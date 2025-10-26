@@ -3,19 +3,18 @@
 #include "timex.h"
 #include "ztimer.h"
 #include "syncTools.h"
-#include <stdio.h>
 
-#define SLEEP_INTERVAL 10
+#define SLEEP_INTERVAL 20
 
-uint8_t RED_BASE = 0;
-uint8_t GREEN_BASE = 0;
-uint8_t BLUE_BASE = 0;
+static uint8_t RED_BASE = 0;
+static uint8_t GREEN_BASE = 0;
+static uint8_t BLUE_BASE = 0;
 
-void resetLED(void){
+static void resetLED(void){
     setOneLED(RED_BASE, GREEN_BASE, BLUE_BASE);
 }
 
-void delay(int msecs)
+static void delay(int msecs)
 {
     int slept = 0;
     while (slept < msecs){

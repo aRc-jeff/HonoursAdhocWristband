@@ -38,7 +38,6 @@
 #include "syncTools.h"
 #include "Effects.h"
 
-
 #define BOARD_LOCATION_X 1
 #define BOARD_LOCATION_Y 1
 
@@ -56,8 +55,6 @@ static uint8_t message[SX126X_MAX_PAYLOAD_LEN];
 
 static sx126x_t sx1262;
 static netdev_t *netdev = &sx1262.netdev;
-
-static uint16_t cmdIndex = 0;
 
 static uint8_t crc8(const uint8_t *data, uint8_t len)
 {
@@ -152,41 +149,11 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
             netdev_lora_rx_info_t packet_info;
             dev->driver->recv(dev, message, len, &packet_info);
             printf(
-                "Received: (%" PRIuSIZE " bytes) - [RSSI: %i, SNR: %i, TOA: %" PRIu32 "ms]\n",
-                len,
+                "Received: \"%s\" (%" PRIuSIZE " bytes) - [RSSI: %i, SNR: %i, TOA: %" PRIu32 "ms]\n",
+                message, len,
                 packet_info.rssi, packet_info.snr,
                 sx126x_get_lora_time_on_air_in_ms(&sx1262.pkt_params, &sx1262.mod_params)
                 );
-            
-            bool radioTxActive = false;
-            cmd_t rxCMD = unpackPacket(message);
-            if (rxCMD.valid){
-                if (cmdIndex < rxCMD.cmdIndex ){
-                    cmdIndex = rxCMD.cmdIndex;
-                    if (rxCMD.TTL-- > 0){
-                        uint8_t* returnMessage = generatePacket(rxCMD);
-                        iolist_t iolist = {
-                            .iol_base = returnMessage,
-                            .iol_len  = PACKET_SIZE,
-                            .iol_next = NULL,
-                        };
-                        radioTxActive = true;
-                        netdev->driver->send(netdev, &iolist);
-                    }
-                    mutex_lock(&lock);
-                    printf("%d\n", rxCMD.queueable);
-                    if (!rxCMD.queueable){
-                        tsrb_clear(&rxCMDs);
-                        newCMDFlag = true;
-                    }
-                    tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, PACKET_SIZE);
-                    mutex_unlock(&lock);
-                    cond_signal(&condition);
-                }
-            }
-            if (!radioTxActive){
-                netdev->driver->set(netdev, NETOPT_STATE, &RXstate, sizeof(RXstate));
-            }
         }
         break;
 
@@ -227,6 +194,16 @@ void *_recv_thread(void *arg)
     }
 }
 
+void sendMessage(cmd_t message){
+    uint8_t* returnMessage = generatePacket(message);
+    iolist_t iolist = {
+        .iol_base = returnMessage,
+        .iol_len  = PACKET_SIZE,
+        .iol_next = NULL,
+    };
+    netdev->driver->send(netdev, &iolist);
+}
+
 static void delay(int seconds)
 {
     ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
@@ -236,7 +213,6 @@ int main(void)
 {
     delay(2);
     puts("Init ThreadTools...");
-
     init_thread_tools();
     ANT_SW_ON;
     puts("Init SX1262...");
@@ -261,28 +237,26 @@ int main(void)
     }
 
     puts("Init Complete");
-    // puts("sleeping mcu");
-    // cortexm_sleep(1);
+
+    cmd_t message;
 
     while (1) {
-        if (tsrb_empty(&rxCMDs)){
-            cond_wait(&condition, &lock);
-        }
-        else{
-            delay(0.015);
-            mutex_lock(&lock);
-        }
-        cmd_t message;
-        tsrb_get(&rxCMDs, (uint8_t*)&message, PACKET_SIZE);
-        newCMDFlag = false;
-        mutex_unlock(&lock);
-        if((message.P1X <= BOARD_LOCATION_X) &&
-            (BOARD_LOCATION_X <= message.P2X)){
-            if((message.P1Y <= BOARD_LOCATION_Y) &&
-                (BOARD_LOCATION_Y <= message.P2Y)){
-                effectFuncs[message.CMD](message);
-            }
-        }
+
+        message = cmd_create(3, 255, 0, 0, 1, 1, 1, 1, true);
+        sendMessage(message);
+        delay(1);
+        message = cmd_create(3, 0, 255, 0, 1, 1, 1, 1, true);
+        sendMessage(message);
+        delay(1);
+        message = cmd_create(3, 0, 0, 255, 1, 1, 1, 1, true);
+        sendMessage(message);
+        delay(1);
+        message = cmd_create(3, 0, 0, 0, 1, 1, 1, 1, true);
+        sendMessage(message);
+        delay(1);
+        message = cmd_create(0, 255, 255, 255, 1, 1, 1, 1, false);
+        sendMessage(message);
+        delay(1);
     }
 
     return 0;

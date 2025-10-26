@@ -10,8 +10,8 @@
 
 
 void setLED (int led, int RED, int GREEN, int BLUE);
-void WS2812_Send (void);
 void setOneLED (int RED, int GREEN, int BLUE);
+void WS2812_Send (void);
 
 
 #endif /* INC_WS2812_SPI_H_ */

@@ -1,5 +1,5 @@
 # name of your application
-APPLICATION = FlashOrTrash_v1.0
+APPLICATION = FlashOrTrash_v1.0_InjectPoint
 
 # Change this to your board if you want to build for a different board
 BOARD ?= rak4631
