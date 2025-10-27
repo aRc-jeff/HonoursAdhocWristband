@@ -16,4 +16,4 @@ extern uint8_t GREEN_BASE;
 extern uint8_t BLUE_BASE;
 
 
-#endif /* INC_EFFECTS_SPI_H_ */
+#endif /* INC_EFFECTS_H_ */

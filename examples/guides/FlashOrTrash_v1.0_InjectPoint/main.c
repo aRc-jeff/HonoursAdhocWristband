@@ -36,6 +36,7 @@
 #include "sx126x_params.h"
 #include "cmd.h"
 #include "random.h"
+#include "Effects.h"
 
 #define BOARD_LOCATION_X 1
 #define BOARD_LOCATION_Y 1
@@ -255,11 +256,11 @@ int main(void)
         // message = cmd_create(0, 0, 0, 255, 1, 1, 1, 1, false);
         // sendMessage(message);
         // delay(60);
-        message = cmd_create(0, 255, 0, 0, 1, 1, 1, 1, false);
-        sendMessage(message);
-        message = cmd_create(6, 0, 255, 0, 1, 1, 1, 1, false);
-        sendMessage(message);
-        delay(12000);
+        // message = cmd_create(0, 255, 0, 0, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // message = cmd_create(6, 0, 255, 0, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(12000);
         // message = cmd_create(3, 0, 0, 255, 1, 1, 1, 1, false);
         // sendMessage(message);
         // delay(1);
@@ -269,6 +270,9 @@ int main(void)
         // message = cmd_create(0, 255, 255, 255, 1, 1, 1, 1, false);
         // sendMessage(message);
         // delay(1);
+
+        message = cmd_create(effect_id_t::SET_COLOUR, 255, 255, 255, 1, 1, 1, 1, false);
+        sendMessage(message);
     }
 
     return 0;
