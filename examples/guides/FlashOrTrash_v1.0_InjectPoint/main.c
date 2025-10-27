@@ -37,6 +37,7 @@
 #include "cmd.h"
 #include "random.h"
 #include "Effects.h"
+#include "Patterns.h"
 
 #define BOARD_LOCATION_X 1
 #define BOARD_LOCATION_Y 1
@@ -218,7 +219,7 @@ uint8_t rand255(void) {
 
 int main(void)
 {
-    delay(2000);
+    delay(3000);
     ANT_SW_ON;
     puts("Init SX1262...");
     sx126x_setup(&sx1262, &sx126x_params[0], 0);
@@ -242,8 +243,6 @@ int main(void)
     }
 
     puts("Init Complete");
-
-    cmd_t message;
 
     while (1) {
 
@@ -270,9 +269,20 @@ int main(void)
         // message = cmd_create(0, 255, 255, 255, 1, 1, 1, 1, false);
         // sendMessage(message);
         // delay(1);
+        
+        // vertical_lines_alternate();
+        // horizontal_lines_alternate();
+        // vertical_lines_fade_through();
+        // delay(20000);
+        // horizontal_lines_fade_through();
+        // delay(20000);
 
-        message = cmd_create(effect_id_t::SET_COLOUR, 255, 255, 255, 1, 1, 1, 1, false);
-        sendMessage(message);
+        fluke_snake();
+
+        vertical_lines_fade_through_short();
+        delay(50000);
+        horizontal_lines_fade_through_short();
+        delay(50000);
     }
 
     return 0;

@@ -40,8 +40,8 @@
 #include "WS2812_SPI.h"
 
 
-#define BOARD_LOCATION_X 4
-#define BOARD_LOCATION_Y 5
+#define BOARD_LOCATION_X 3
+#define BOARD_LOCATION_Y 1
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)

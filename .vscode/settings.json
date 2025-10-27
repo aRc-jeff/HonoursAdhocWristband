@@ -48,7 +48,8 @@
         "sx126x_regs.h": "c",
         "debug.h": "c",
         "cmd.h": "c",
-        "effects.h": "c"
+        "effects.h": "c",
+        "system_error": "c"
     },
     "[shellscript][c][cpp]": {
         "editor.tabSize": 4,
