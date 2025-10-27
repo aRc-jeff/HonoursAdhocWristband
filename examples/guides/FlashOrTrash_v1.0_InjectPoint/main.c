@@ -35,11 +35,12 @@
 #include "periph/gpio.h"
 #include "sx126x_params.h"
 #include "cmd.h"
-#include "syncTools.h"
-#include "Effects.h"
+#include "random.h"
 
 #define BOARD_LOCATION_X 1
 #define BOARD_LOCATION_Y 1
+
+#define RADIO_SEND_DELAY 60
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
@@ -194,6 +195,11 @@ void *_recv_thread(void *arg)
     }
 }
 
+static void delay(int ms)
+{
+    ztimer_sleep(ZTIMER_USEC, ms * 1000);
+}
+
 void sendMessage(cmd_t message){
     uint8_t* returnMessage = generatePacket(message);
     iolist_t iolist = {
@@ -202,18 +208,16 @@ void sendMessage(cmd_t message){
         .iol_next = NULL,
     };
     netdev->driver->send(netdev, &iolist);
+    delay(RADIO_SEND_DELAY);
 }
 
-static void delay(int seconds)
-{
-    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
+uint8_t rand255(void) {
+    return (uint8_t)(random_uint32() % 256);
 }
 
 int main(void)
 {
-    delay(2);
-    puts("Init ThreadTools...");
-    init_thread_tools();
+    delay(2000);
     ANT_SW_ON;
     puts("Init SX1262...");
     sx126x_setup(&sx1262, &sx126x_params[0], 0);
@@ -242,21 +246,29 @@ int main(void)
 
     while (1) {
 
-        message = cmd_create(3, 255, 0, 0, 1, 1, 1, 1, true);
+        // message = cmd_create(0, 255, 0, 0, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(60);
+        // message = cmd_create(0, 0, 255, 0, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(60);
+        // message = cmd_create(0, 0, 0, 255, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(60);
+        message = cmd_create(0, 255, 0, 0, 1, 1, 1, 1, false);
         sendMessage(message);
-        delay(1);
-        message = cmd_create(3, 0, 255, 0, 1, 1, 1, 1, true);
+        message = cmd_create(6, 0, 255, 0, 1, 1, 1, 1, false);
         sendMessage(message);
-        delay(1);
-        message = cmd_create(3, 0, 0, 255, 1, 1, 1, 1, true);
-        sendMessage(message);
-        delay(1);
-        message = cmd_create(3, 0, 0, 0, 1, 1, 1, 1, true);
-        sendMessage(message);
-        delay(1);
-        message = cmd_create(0, 255, 255, 255, 1, 1, 1, 1, false);
-        sendMessage(message);
-        delay(1);
+        delay(12000);
+        // message = cmd_create(3, 0, 0, 255, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(1);
+        // message = cmd_create(3, 0, 0, 0, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(1);
+        // message = cmd_create(0, 255, 255, 255, 1, 1, 1, 1, false);
+        // sendMessage(message);
+        // delay(1);
     }
 
     return 0;

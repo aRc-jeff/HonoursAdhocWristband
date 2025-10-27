@@ -2,7 +2,7 @@
 APPLICATION = FlashOrTrash_v1.0_InjectPoint
 
 # Change this to your board if you want to build for a different board
-BOARD ?= rak4631
+BOARD ?= flash-or-trash-v1
 
 # This has to be the absolute path to the RIOT base directory:
 # If you are following the tutorial, your RIOT base directory will
@@ -23,5 +23,6 @@ FEATURES_OPTIONAL += periph_timer
 
 USEMODULE += periph_spi
 USEMODULE += netdev
+USEMODULE += random
 
 include $(RIOTBASE)/Makefile.include

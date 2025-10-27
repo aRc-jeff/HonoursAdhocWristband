@@ -37,10 +37,11 @@
 #include "cmd.h"
 #include "syncTools.h"
 #include "Effects.h"
+#include "WS2812_SPI.h"
 
 
-#define BOARD_LOCATION_X 1
-#define BOARD_LOCATION_Y 1
+#define BOARD_LOCATION_X 4
+#define BOARD_LOCATION_Y 5
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
@@ -174,7 +175,6 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
                         netdev->driver->send(netdev, &iolist);
                     }
                     mutex_lock(&lock);
-                    printf("%d\n", rxCMD.queueable);
                     if (!rxCMD.queueable){
                         tsrb_clear(&rxCMDs);
                         newCMDFlag = true;
@@ -227,14 +227,14 @@ void *_recv_thread(void *arg)
     }
 }
 
-static void delay(int seconds)
+static void delay(int ms)
 {
-    ztimer_sleep(ZTIMER_USEC, seconds * US_PER_SEC);
+    ztimer_sleep(ZTIMER_USEC, ms * 1000);
 }
 
 int main(void)
 {
-    delay(2);
+    delay(2000);
     puts("Init ThreadTools...");
 
     init_thread_tools();
@@ -269,7 +269,7 @@ int main(void)
             cond_wait(&condition, &lock);
         }
         else{
-            delay(0.015);
+            delay(LED_TIME_GUARD);
             mutex_lock(&lock);
         }
         cmd_t message;
