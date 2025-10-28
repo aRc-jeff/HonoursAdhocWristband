@@ -49,7 +49,18 @@
         "debug.h": "c",
         "cmd.h": "c",
         "effects.h": "c",
-        "system_error": "c"
+        "system_error": "c",
+        "charconv": "c",
+        "optional": "c",
+        "format": "c",
+        "ratio": "c",
+        "array": "c",
+        "functional": "c",
+        "regex": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "sleepoffset.h": "c"
     },
     "[shellscript][c][cpp]": {
         "editor.tabSize": 4,

@@ -38,16 +38,19 @@
 #include "syncTools.h"
 #include "Effects.h"
 #include "WS2812_SPI.h"
+#include "sleepOffset.h"
 
 
-#define BOARD_LOCATION_X 3
-#define BOARD_LOCATION_Y 1
+#define BOARD_LOCATION_X 4
+#define BOARD_LOCATION_Y 5
 
 #define SX126X_MSG_QUEUE        (8U)
 #define SX126X_STACKSIZE        (THREAD_STACKSIZE_DEFAULT)
 #define SX126X_MSG_TYPE_ISR     (0x3456)
 #define SX126X_MAX_PAYLOAD_LEN  (128U)
 #define PACKET_SIZE 16 //must be a power of 2
+
+double DRIFT_FACTOR = 1;
 
 static netopt_state_t RXstate = NETOPT_STATE_RX;
 static char stack[SX126X_STACKSIZE];
@@ -134,6 +137,9 @@ cmd_t unpackPacket(uint8_t* packet){
 
 static void event_cb(netdev_t *dev, netdev_event_t event)
 {
+    static uint32_t firstTime;
+    static uint32_t secondTime;
+    static bool calibrating = false;
     if (event == NETDEV_EVENT_ISR) {
         msg_t msg;
         msg.type = SX126X_MSG_TYPE_ISR;
@@ -162,26 +168,48 @@ static void event_cb(netdev_t *dev, netdev_event_t event)
             bool radioTxActive = false;
             cmd_t rxCMD = unpackPacket(message);
             if (rxCMD.valid){
-                if (cmdIndex < rxCMD.cmdIndex ){
-                    cmdIndex = rxCMD.cmdIndex;
-                    if (rxCMD.TTL-- > 0){
-                        uint8_t* returnMessage = generatePacket(rxCMD);
-                        iolist_t iolist = {
-                            .iol_base = returnMessage,
-                            .iol_len  = PACKET_SIZE,
-                            .iol_next = NULL,
-                        };
-                        radioTxActive = true;
-                        netdev->driver->send(netdev, &iolist);
+                if((rxCMD.P1X <= BOARD_LOCATION_X) &&
+                    (BOARD_LOCATION_X <= rxCMD.P2X)){
+                    if((rxCMD.P1Y <= BOARD_LOCATION_Y) &&
+                        (BOARD_LOCATION_Y <= rxCMD.P2Y)){
+                        if (rxCMD.blank1 != 0){
+                            if(!calibrating){
+                                firstTime = ztimer_now(ZTIMER_USEC);
+                                calibrating = true;
+                            }
+                            else {
+                                secondTime = ztimer_now(ZTIMER_USEC);
+                                DRIFT_FACTOR = (double)(rxCMD.blank1*1000000)/(secondTime - firstTime);
+                                calibrating = false;
+                            }
+                        }
+                        if (rxCMD.blank2 != 0){
+                            DRIFT_FACTOR = 1;
+                        }
+
+                        if (cmdIndex < rxCMD.cmdIndex ){
+                            cmdIndex = rxCMD.cmdIndex;
+                            if (rxCMD.TTL-- > 0){
+                                uint8_t* returnMessage = generatePacket(rxCMD);
+                                iolist_t iolist = {
+                                    .iol_base = returnMessage,
+                                    .iol_len  = PACKET_SIZE,
+                                    .iol_next = NULL,
+                                };
+                                radioTxActive = true;
+                                netdev->driver->send(netdev, &iolist);
+                            }
+                            
+                            mutex_lock(&lock);
+                            if (!rxCMD.queueable){
+                                tsrb_clear(&rxCMDs);
+                                newCMDFlag = true;
+                            }
+                            tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, PACKET_SIZE);
+                            mutex_unlock(&lock);
+                            cond_signal(&condition);
+                        }
                     }
-                    mutex_lock(&lock);
-                    if (!rxCMD.queueable){
-                        tsrb_clear(&rxCMDs);
-                        newCMDFlag = true;
-                    }
-                    tsrb_add(&rxCMDs, (uint8_t*)&rxCMD, PACKET_SIZE);
-                    mutex_unlock(&lock);
-                    cond_signal(&condition);
                 }
             }
             if (!radioTxActive){
@@ -229,7 +257,7 @@ void *_recv_thread(void *arg)
 
 static void delay(int ms)
 {
-    ztimer_sleep(ZTIMER_USEC, ms * 1000);
+    ztimer_sleep(ZTIMER_USEC, ms * 1000 * DRIFT_FACTOR);
 }
 
 int main(void)
@@ -276,13 +304,7 @@ int main(void)
         tsrb_get(&rxCMDs, (uint8_t*)&message, PACKET_SIZE);
         newCMDFlag = false;
         mutex_unlock(&lock);
-        if((message.P1X <= BOARD_LOCATION_X) &&
-            (BOARD_LOCATION_X <= message.P2X)){
-            if((message.P1Y <= BOARD_LOCATION_Y) &&
-                (BOARD_LOCATION_Y <= message.P2Y)){
-                effectFuncs[message.CMD](message);
-            }
-        }
+        effectFuncs[message.CMD](message);
     }
 
     return 0;

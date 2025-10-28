@@ -36,6 +36,7 @@
 
 typedef enum {
     SET_COLOUR,
+    BLINK_250MS,
     BLINK_500MS,
     BLINK_1000MS,
     BLINK_2000MS,

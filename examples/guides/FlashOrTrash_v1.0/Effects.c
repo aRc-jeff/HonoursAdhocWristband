@@ -4,6 +4,7 @@
 #include "ztimer.h"
 #include "syncTools.h"
 #include <stdio.h>
+#include "sleepOffset.h"
 
 #define SLEEP_INTERVAL 10
 
@@ -25,7 +26,7 @@ static void delay(int msecs)
             return;
         }
         mutex_unlock(&lock);
-        ztimer_sleep(ZTIMER_USEC, SLEEP_INTERVAL*1000);
+        ztimer_sleep(ZTIMER_USEC, SLEEP_INTERVAL * 1000 * DRIFT_FACTOR);
         slept += SLEEP_INTERVAL;
     }
     return;
@@ -56,7 +57,7 @@ static void fadeBetween(uint8_t fromR, uint8_t fromG, uint8_t fromB,
         GREEN_BASE = (uint8_t)currG;
         BLUE_BASE = (uint8_t)currB;
         setOneLED(RED_BASE, GREEN_BASE, BLUE_BASE);
-        ztimer_sleep(ZTIMER_USEC, LED_TIME_GUARD * 1000);
+        ztimer_sleep(ZTIMER_USEC, LED_TIME_GUARD * 1000 * DRIFT_FACTOR);
         currR += stepR;
         currG += stepG;
         currB += stepB;
@@ -72,6 +73,13 @@ int effect_setColour(cmd_t cmd) {
     RED_BASE = cmd.RED;
     GREEN_BASE = cmd.GREEN;
     BLUE_BASE = cmd.BLUE;
+    resetLED();
+    return 0;
+}
+
+int effect_blink250ms(cmd_t cmd) {
+    setOneLED(cmd.RED, cmd.GREEN, cmd.BLUE);
+    delay(250);
     resetLED();
     return 0;
 }
@@ -123,6 +131,7 @@ int effect_fade10s(cmd_t cmd)
 
 int (*effectFuncs[])(cmd_t) = {
     effect_setColour,
+    effect_blink250ms,
     effect_blink500ms,
     effect_blink1000ms,
     effect_blink2000ms,

@@ -244,6 +244,22 @@ int main(void)
 
     puts("Init Complete");
 
+    cmd_t message;
+    uint16_t timeS = 3;
+    message = cmd_create(SET_COLOUR, 0, 0, 0, 1, 1, 4, 5, false);
+    message.blank1 = 1;
+    sendMessage(message);
+    delay(timeS*1000);
+    message = cmd_create(SET_COLOUR, 0, 0, 0, 1, 1, 4, 5, false);
+    message.blank1 = timeS;
+    sendMessage(message);
+
+    // delay(4000);
+    // message = cmd_create(SET_COLOUR, 0, 0, 0, 1, 1, 4, 5, false);
+    // message.blank2 = 1;
+    // sendMessage(message);
+
+
     while (1) {
 
         // message = cmd_create(0, 255, 0, 0, 1, 1, 1, 1, false);
@@ -279,10 +295,17 @@ int main(void)
 
         fluke_snake();
 
-        vertical_lines_fade_through_short();
-        delay(50000);
-        horizontal_lines_fade_through_short();
-        delay(50000);
+        //snake(COLOUR_GREEN);
+        spiral_fill_in();
+        diagonal_sweep();
+
+        horizontal_zappies(COLOUR_PURPLE, 100, 60);
+        rain(COLOUR_BLUE, 200, 0);
+
+        // vertical_lines_fade_through_short();
+        // delay(50000);
+        // horizontal_lines_fade_through_short();
+        // delay(50000);
     }
 
     return 0;
